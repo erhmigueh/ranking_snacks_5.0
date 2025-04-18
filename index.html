@@ -1,0 +1,138 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Ranking de Snacks</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    body { font-family: sans-serif; padding: 20px; }
+    .hidden { display: none; }
+    .category { margin-bottom: 20px; }
+    .snack { margin: 5px 0; }
+    h3, h4 { color: #2c3e50; }
+    canvas { margin-bottom: 30px; }
+  </style>
+</head>
+<body>
+  <h1>Ranking de Snacks</h1>
+  <div id="login">
+    <label>Introduce tu alias: <input type="text" id="alias" /></label>
+    <button onclick="start()">Entrar</button>
+  </div>
+  <div id="voting" class="hidden">
+    <h2>Hola, <span id="userAlias"></span> 👋</h2>
+    <form id="rankingForm">
+      <div class="category">
+        <h3>Mejor snack dulce</h3>
+        <div class="snack"><label>KitKat</label> <input type="text" name="dulceKitKat" /></div>
+        <div class="snack"><label>Twix</label> <input type="text" name="dulceTwix" /></div>
+        <div class="snack"><label>Kinder Bueno</label> <input type="text" name="dulceKinder" /></div>
+        <div class="snack"><label>Huesitos</label> <input type="text" name="dulceHuesitos" /></div>
+        <div class="snack"><label>Snickers</label> <input type="text" name="dulceSnickers" /></div>
+        <div class="snack"><label>Phoskitos</label> <input type="text" name="dulcePhoskitos" /></div>
+      </div>
+      <div class="category">
+        <h3>Mejor snack salado</h3>
+        <div class="snack"><label>Pelotazos</label> <input type="text" name="saladoPelotazos" /></div>
+        <div class="snack"><label>Gusanitos</label> <input type="text" name="saladoGusanitos" /></div>
+        <div class="snack"><label>Doritos</label> <input type="text" name="saladoDoritos" /></div>
+        <div class="snack"><label>Ruffles de Jamón</label> <input type="text" name="saladoRuffles" /></div>
+        <div class="snack"><label>Conos</label> <input type="text" name="saladoConos" /></div>
+        <div class="snack"><label>Jumpers</label> <input type="text" name="saladoJumpers" /></div>
+      </div>
+      <button id="submitBtn" type="submit" class="hidden">Enviar</button>
+    </form>
+  </div>
+  <div id="result" class="hidden">
+    <h3>¡Gracias por votar!</h3>
+    <h4>Snacks Dulces</h4>
+    <canvas id="chartDulce" width="600" height="300"></canvas>
+    <h4>Snacks Salados</h4>
+    <canvas id="chartSalado" width="600" height="300"></canvas>
+  </div>
+  <script>
+    function start() {
+      const alias = document.getElementById("alias").value.trim();
+      if (!alias) return alert("Por favor, escribe tu alias.");
+      document.getElementById("userAlias").textContent = alias;
+      document.getElementById("login").classList.add("hidden");
+      document.getElementById("voting").classList.remove("hidden");
+    }
+
+    function checkFormCompletion() {
+      const inputs = document.querySelectorAll('input[type="text"]');
+      let allFilled = true;
+      inputs.forEach(input => {
+        if (input.value === "") allFilled = false;
+      });
+      document.getElementById("submitBtn").classList.toggle("hidden", !allFilled);
+    }
+
+    document.getElementById("rankingForm").addEventListener("input", checkFormCompletion);
+
+    document.getElementById("rankingForm").addEventListener("submit", function (e) {
+      e.preventDefault();
+      const formData = new FormData(e.target);
+      const alias = document.getElementById("alias").value.trim();
+      const voto = { alias };
+      formData.forEach((value, key) => {
+        voto[key] = parseInt(value);
+      });
+      let votos = JSON.parse(localStorage.getItem("votos") || "[]");
+      votos.push(voto);
+      localStorage.setItem("votos", JSON.stringify(votos));
+      document.getElementById("voting").classList.add("hidden");
+      document.getElementById("result").classList.remove("hidden");
+
+      const snacksDulces = ['dulceKitKat', 'dulceTwix', 'dulceKinder', 'dulceHuesitos', 'dulceSnickers', 'dulcePhoskitos'];
+      const snacksSalados = ['saladoPelotazos', 'saladoGusanitos', 'saladoDoritos', 'saladoRuffles', 'saladoConos', 'saladoJumpers'];
+      const labels = {
+        dulceKitKat: "KitKat", dulceTwix: "Twix", dulceKinder: "Kinder Bueno",
+        dulceHuesitos: "Huesitos", dulceSnickers: "Snickers", dulcePhoskitos: "Phoskitos",
+        saladoPelotazos: "Pelotazos", saladoGusanitos: "Gusanitos", saladoDoritos: "Doritos",
+        saladoRuffles: "Ruffles de Jamón", saladoConos: "Conos", saladoJumpers: "Jumpers"
+      };
+
+      function calculateAverages(snacks, votos) {
+        const averages = snacks.map(snack => {
+          const valores = votos.map(v => parseInt(v[snack])).filter(n => !isNaN(n));
+          const media = valores.reduce((a, b) => a + b, 0) / valores.length;
+          return { name: labels[snack], value: media };
+        });
+        return averages.sort((a, b) => a.value - b.value);
+      }
+
+      const dulcesData = calculateAverages(snacksDulces, votos);
+      const saladosData = calculateAverages(snacksSalados, votos);
+
+      drawChart('chartDulce', dulcesData);
+      drawChart('chartSalado', saladosData);
+    });
+
+    function drawChart(canvasId, data) {
+      const ctx = document.getElementById(canvasId).getContext("2d");
+      new Chart(ctx, {
+        type: "bar",
+        data: {
+          labels: data.map(d => d.name),
+          datasets: [{
+            label: "Puntuación media (más baja = mejor)",
+            data: data.map(d => d.value),
+            backgroundColor: "rgba(54, 162, 235, 0.6)",
+            borderColor: "rgba(54, 162, 235, 1)",
+            borderWidth: 1
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          scales: {
+            x: { beginAtZero: true },
+            y: { ticks: { autoSkip: false } }
+          }
+        }
+      });
+    }
+  </script>
+</body>
+</html>
